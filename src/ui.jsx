@@ -29,6 +29,7 @@ export const ICONS = {
   tab: 'M3 4h18v16H3zM3 10h18M3 15h18M9 4v16',
   note: 'M4 4h16v11l-5 5H4zM15 20v-5h5',
   label: 'M5 6V4h14v2M12 4v16M9 20h6',
+  prep: 'M4 20L14 10M12 8l4 4M15 2v3M15 9v2M11 5.5h2M17.5 5.5H20M19.5 13v2.5M18.2 14.2h2.6',
   board: 'M3 4h7v6H3zM14 14h7v6h-7zM10 7h3a2 2 0 0 1 2 2v5',
   grid: 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z',
 };

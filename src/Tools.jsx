@@ -80,7 +80,85 @@ export const CATALOG = [
   ] },
 ];
 
+// Standalone data-prep tool, shown as a banner above the three columns.
+export const PREP_TOOL = {
+  id: 'prep', name: 'Clean & prepare data', prep: true,
+  desc: 'Find and fix problems in a spreadsheet before you use it anywhere else.',
+  long: 'Check a file for problems, approve the fixes you want, and save them as a recipe you can reuse on next month’s file.',
+  accepts: 'CSV, XLSX, Parquet', sample: ['sales_export_messy.xlsx', '5.2 MB'],
+  models: [['Auto', 'Rule checks plus AI suggestions']],
+  opts: [sel('fmt', 'Save cleaned file as', ['CSV', 'Excel (.xlsx)', 'Parquet'], 'CSV'), tog('recipe', 'Save fixes as a reusable recipe', true), tog('auto', 'Apply the recipe to future uploads automatically', false)],
+  result: { kind: 'recipe', title: 'Cleaned file preview · first 4 rows', cols: ['DATE', 'BRANCH', 'REVENUE'],
+    rows: [['2026-10-01', 'Bangkok', '48,210.00'], ['2026-10-01', 'Chiang Mai', '21,905.50'], ['2026-10-02', 'Bangkok', '51,377.25'], ['2026-10-02', 'Phuket', '18,640.00']],
+    metrics: [['Rows in', '18,240'], ['Rows out', '18,102'], ['Fixes applied', '5', TEAL]] },
+};
+
+// Data checks per tool: [severity, problem, note, fix, before, after, recommended]
+// severity 'fix' = should usually be fixed, 'info' = worth knowing.
+// Some fixes are NOT recommended on purpose: what counts as "clean" depends on the task.
+export const CHECKS = {
+  prep: [
+    ['fix', 'Dates in 3 different formats', '', 'Convert all dates to YYYY-MM-DD', '03/10/26 · Oct 3, 2026', '2026-10-03', true],
+    ['fix', '138 duplicate rows', 'Exact copies of other rows.', 'Remove duplicates', '18,240 rows', '18,102 rows', true],
+    ['fix', 'Revenue stored as text in 412 rows', '', 'Convert to numbers', '"1,240.00 THB"', '1240.00', true],
+    ['fix', 'Same branch spelled 3 ways', '', 'Merge into one name', 'Bangkok · BKK · bangkok ', 'Bangkok', true],
+    ['fix', '2 extra header rows at the top', 'Title rows above the real column names.', 'Skip the first 2 rows', 'Row 1: “Sales export”', 'Row 1: date, branch, …', true],
+    ['info', '96 rows have no revenue', 'Could be days a branch was closed.', 'Fill with 0', 'empty', '0', false, 'Filling blanks with 0 could hide missing data. Leave empty unless you know the branch was closed.'],
+  ],
+  ocr: [
+    ['fix', '6 pages are rotated', '', 'Auto-rotate pages', 'page 14: 90°', 'page 14: upright', true],
+    ['fix', '11 pages are faint or low-contrast', 'Usually photocopies or phone photos in dim light.', 'Enhance contrast', 'faint scan', 'sharpened', true],
+    ['fix', '2 pages are too blurry to read reliably', '', 'Send these pages to manual review', 'pages 41, 87', 'review queue', true],
+    ['info', 'Handwriting on 9 pages', 'Printed-text models misread handwriting.', 'Use TrOCR for those pages', 'PaddleOCR', 'TrOCR-large', true],
+  ],
+  img: [
+    ['fix', '18 duplicate images', '', 'Remove duplicates', '1,222 images', '1,204 images', true],
+    ['fix', '3 files can’t be opened', 'Corrupt or not really images.', 'Skip these files', 'IMG_0412.jpg …', 'skipped', true],
+    ['info', '41 images are smaller than 64 × 64 px', 'Too small to classify well.', 'Skip tiny images', '48 × 48 px', 'skipped', false, 'Optional: keep them if small images are normal for your data.'],
+    ['info', 'Classes are unbalanced', '“Accessories” has only 8% of images.', 'Weight classes during training', '8% vs 42%', 'balanced weights', true],
+  ],
+  det: [
+    ['fix', 'Image is 4032 × 3024 px', 'Large images slow detection without improving it.', 'Resize to 1280 px on the longest side', '4032 × 3024', '1280 × 960', true],
+    ['info', 'Motion blur in the lower half', '', 'Flag detections in blurred areas', 'no flag', 'flagged', true],
+    ['info', 'Glare on the right side', 'Products under glare may be missed.', 'Note it in the results', '', 'noted', true],
+  ],
+  txt: [
+    ['fix', '126 duplicate reviews', '', 'Remove duplicates', '2,482 rows', '2,356 rows', true],
+    ['fix', '38 empty rows', '', 'Remove empty rows', '2,356 rows', '2,318 rows', true],
+    ['fix', 'HTML tags in 212 rows', '', 'Strip HTML, keep emoji', '<p>Great service!! 😍</p>', 'Great service!! 😍', true],
+    ['info', 'Mixed Thai and English', '41% Thai, 59% English.', 'Keep both and use a multilingual model', 'DistilBERT', 'XLM-RoBERTa', true],
+  ],
+  sum: [
+    ['fix', 'Header and page number repeat on every page', '', 'Remove repeated headers and footers', '“Q3 Report · Page 12”', 'removed', true],
+    ['fix', '4 pages are scanned images', 'They contain no selectable text.', 'Run OCR on those pages first', 'no text', 'text extracted', true],
+    ['info', 'Tables on 6 pages', '', 'Keep tables as structured text', 'layout lost', 'rows kept', true],
+  ],
+  ner: [
+    ['fix', '3 files are password-protected', '', 'Skip them and list them in the results', '56 files', '53 files', true],
+    ['fix', 'Thai numerals in 7 files', '', 'Convert to Arabic numerals', '๒,๔๐๐,๐๐๐ บาท', '2,400,000 บาท', true],
+    ['fix', 'Same company written 4 ways', '', 'Merge spelling variants', 'Siam Logistic Co. · SIAM LOGISTICS', 'Siam Logistics Co., Ltd.', true],
+  ],
+  ts: [
+    ['fix', 'Dates in 2 different formats', '', 'Convert to YYYY-MM-DD', '03/10/26 · Oct 3 2026', '2026-10-03', true],
+    ['fix', '2 weeks appear twice', '', 'Add duplicate weeks together', '2 rows for Jun 8', '1 row', true],
+    ['fix', 'Revenue stored as text in 31 rows', '', 'Convert to numbers', '"1,240.00 THB"', '1240.00', true],
+    ['info', '4 weeks missing in April 2026', 'Could be a closure or an export problem.', 'Fill gaps with the average', 'gap', '1.02M', false, 'Averages could hide a real closure. The model can handle the gap as it is.'],
+  ],
+  anom: [
+    ['fix', 'Timestamps in two time zones', '', 'Convert all to Asia/Bangkok', '2026-10-12T03:14Z', '2026-10-12 10:14', true],
+    ['info', '212 rows missing latency_ms', 'The model can work with gaps.', 'Leave empty', 'empty', 'empty', true],
+    ['info', '37 extreme values in amount', '', 'Remove extreme values', '37 rows', 'removed', false, 'These may be exactly the anomalies you want to find.'],
+  ],
+  tab: [
+    ['fix', 'cancel_date reveals the answer', 'It is only filled in for customers who already churned.', 'Exclude this column', 'used', 'excluded', true],
+    ['fix', 'customer_id is an ID column', 'IDs let the model memorise rows instead of learning patterns.', 'Exclude this column', 'used', 'excluded', true],
+    ['fix', 'Missing values in 3 columns', '', 'Fill numbers with the median, categories with “Unknown”', 'empty', 'median / Unknown', true],
+    ['info', 'Only 14% of customers churned', 'Unbalanced classes can make accuracy look better than it is.', 'Balance classes during training', '14% vs 86%', 'weighted', true],
+  ],
+};
+
 function findTool(id) {
+  if (id === PREP_TOOL.id) return { tool: PREP_TOOL, column: 'Data preparation' };
   for (const col of CATALOG) for (const t of col.tools) if (t.id === id) return { tool: t, column: col.name };
   return null;
 }
@@ -100,7 +178,26 @@ export default class Tools extends React.Component {
     const { tool } = findTool(id);
     const opts = {};
     tool.opts.forEach((o) => { opts[o.key] = o.value; });
-    return { file: null, size: '', model: tool.models[0][0], opts, status: 'idle' };
+    return { file: null, size: '', model: tool.models[0][0], opts, status: 'idle', check: 'none', fixes: {} };
+  }
+  loadFile(id, file, size) {
+    this.setWork(id, { file, size, status: 'ready', check: 'running', fixes: {} });
+    this.timers.push(setTimeout(() => {
+      const fixes = {};
+      (CHECKS[id] || []).forEach((c, i) => { fixes[i] = !!c[6]; });
+      this.setWork(id, { check: 'done', fixes });
+    }, 1200));
+  }
+  clearFile(id) { this.setWork(id, { file: null, size: '', status: 'idle', check: 'none', fixes: {} }); }
+  toggleFix(id, i) {
+    const w = this.work(id);
+    this.setWork(id, { fixes: { ...w.fixes, [i]: !w.fixes[i] }, status: w.status === 'done' ? 'ready' : w.status });
+  }
+  acceptRecommended(id) {
+    const fixes = {};
+    (CHECKS[id] || []).forEach((c, i) => { fixes[i] = !!c[6]; });
+    const w = this.work(id);
+    this.setWork(id, { fixes, status: w.status === 'done' ? 'ready' : w.status });
   }
   setWork(id, patch) {
     this.setState((s) => ({ work: { ...s.work, [id]: { ...(s.work[id] || this.work(id)), ...patch } } }));
@@ -111,9 +208,68 @@ export default class Tools extends React.Component {
   }
   run(id) {
     const w = this.work(id);
-    if (!w.file || w.status === 'running') return;
+    if (!w.file || w.status === 'running' || w.check === 'running') return;
     this.setWork(id, { status: 'running' });
     this.timers.push(setTimeout(() => this.setWork(id, { status: 'done' }), 1500));
+  }
+
+  renderCheck(id, w, checks, card, step) {
+    const nOn = checks.filter((c, i) => w.fixes[i]).length;
+    const muted = css('margin: 0; font-size: 13px; color: #5A6670');
+    return (
+      <section style={card}>
+        {step(2, 'Check data')}
+        {!w.file && <p style={muted}>Upload a file and it will be checked for problems before anything runs.</p>}
+        {w.check === 'running' && (
+          <div style={css('display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 10px; background: #F7F9FA')}>
+            <span style={css('font-size: 13px')}>Checking <b>{w.file}</b> for problems…</span>
+            <div style={css('height: 6px; border-radius: 3px; background: #DDE2E6; overflow: hidden')}><div className="bar-run" style={css('width: 40%; height: 100%; border-radius: 3px; background: #0B6E5F')} /></div>
+          </div>
+        )}
+        {w.check === 'done' && checks.length === 0 && <p style={muted}>No problems found.</p>}
+        {w.check === 'done' && checks.length > 0 && (
+          <>
+            <div style={css('display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px')}>
+              <span style={css('font-size: 13.5px')}><b>{checks.length} things found</b> · {nOn} {nOn === 1 ? 'fix' : 'fixes'} selected</span>
+              <button onClick={() => this.acceptRecommended(id)} style={css('border: 0; background: transparent; color: #0B6E5F; font-weight: 600; padding: 4px 0; min-height: 32px; text-decoration: underline')}>Use recommended</button>
+            </div>
+            <ul style={css('list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px')}>
+              {checks.map(([sev, title, note, fix, before, after, rec, why], i) => {
+                const on = !!w.fixes[i];
+                return (
+                  <li key={title} style={css(`display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid ${on ? '#B8DDD4' : '#E3E7EB'}; border-radius: 10px; background: ${on ? '#F6FBFA' : '#FFFFFF'}`)}>
+                    <div style={css('display: flex; align-items: flex-start; gap: 8px')}>
+                      <span title={sev === 'fix' ? 'Problem' : 'Worth knowing'} style={css(`flex: none; margin-top: 6px; width: 8px; height: 8px; border-radius: 50%; background: ${sev === 'fix' ? AMBER : '#3F4C8A'}`)} />
+                      <span style={css('display: flex; flex-direction: column; min-width: 0')}>
+                        <span style={css('font-weight: 600; font-size: 13.5px')}>{title}</span>
+                        {note && <span style={css('font-size: 12.5px; color: #5A6670')}>{note}</span>}
+                      </span>
+                    </div>
+                    {(before || after) && (
+                      <div style={css(`display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-left: 16px; padding: 6px 8px; border-radius: 6px; background: #F4F6F8; font-family: ${MONO}; font-size: 11.5px; overflow-wrap: anywhere`)}>
+                        <span style={css('color: #5A6670')}>{before || '—'}</span>
+                        <Icon d="M5 12h14M13 6l6 6-6 6" size={13} color="#8C979F" />
+                        <span style={css('color: #142019; font-weight: 500')}>{after || '—'}</span>
+                      </div>
+                    )}
+                    <button role="checkbox" aria-checked={on} onClick={() => this.toggleFix(id, i)}
+                      style={css(`display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-left: 16px; border: 0; background: transparent; padding: 2px 0; min-height: 34px; text-align: left; font-weight: 600; font-size: 13px; color: ${on ? '#0B6E5F' : '#3E4A53'}`)}>
+                      <span style={css(`flex: none; width: 18px; height: 18px; border-radius: 4px; border: 2px solid ${on ? '#0B6E5F' : '#9AA4AC'}; background: ${on ? '#0B6E5F' : '#FFFFFF'}; display: grid; place-items: center`)}>
+                        {on && <Icon d="M5 12l5 5 9-10" size={12} color="#FFFFFF" width={3} />}
+                      </span>
+                      <span style={css('flex: 1 1 140px; min-width: 0')}>{fix}</span>
+                      {!rec && <span style={css('flex: none; padding: 1px 8px; border-radius: 999px; background: #FBEBD0; color: #8A4F00; font-size: 11px; font-weight: 600')}>Not recommended</span>}
+                    </button>
+                    {!rec && why && <span style={css('margin-left: 16px; font-size: 12px; color: #8A4F00')}>{why}</span>}
+                  </li>
+                );
+              })}
+            </ul>
+            <span style={css('font-size: 12px; color: #5A6670')}>Your original file is kept. Accepted fixes are saved as a recipe you can reuse.</span>
+          </>
+        )}
+      </section>
+    );
   }
 
   renderHome() {
@@ -131,6 +287,19 @@ export default class Tools extends React.Component {
               style={css('flex: 1 1 auto; min-width: 0; border: 0; background: transparent; min-height: 40px; outline: none')} />
           </label>
         </div>
+
+        {(!q || (PREP_TOOL.name + ' ' + PREP_TOOL.desc + ' clean').toLowerCase().includes(q)) && (
+          <button className="tool-card" onClick={() => this.setState({ toolId: PREP_TOOL.id })}
+            style={css('display: flex; flex-wrap: wrap; align-items: center; gap: 14px 18px; text-align: left; padding: 18px 20px; border: 1px solid #D9DEE3; border-radius: 16px; background: #FFFFFF; box-shadow: 0 1px 2px rgba(20, 32, 25, 0.04); transition: border-color 0.12s, box-shadow 0.12s')}>
+            <span style={css('flex: none; width: 48px; height: 48px; border-radius: 12px; background: #142019; color: #FFFFFF; display: grid; place-items: center')}><Icon name="prep" size={24} /></span>
+            <span style={css('flex: 1 1 320px; min-width: 0; display: flex; flex-direction: column; gap: 2px')}>
+              <span style={css(`font-family: ${MONO}; font-size: 10.5px; letter-spacing: 0.1em; color: #0B6E5F`)}>START HERE IF YOUR DATA IS MESSY</span>
+              <span style={css(`font-family: ${DISPLAY}; font-weight: 700; font-size: 19px`)}>{PREP_TOOL.name}</span>
+              <span style={css('font-size: 13.5px; color: #5A6670')}>{PREP_TOOL.desc} Every tool below also checks your data automatically.</span>
+            </span>
+            <span style={css('flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; min-height: 40px; border-radius: 8px; background: #0B6E5F; color: #FFFFFF; font-weight: 600')}>Open<Icon d="M9 6l6 6-6 6" size={16} /></span>
+          </button>
+        )}
 
         <div className="cols" style={css('display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; align-items: start')}>
           {CATALOG.map((col) => {
@@ -170,7 +339,13 @@ export default class Tools extends React.Component {
     const id = t.id, w = this.work(id), r = t.result;
     const st = STATUS[w.status] || STATUS.idle;
     const done = w.status === 'done';
-    const cantRun = !w.file || w.status === 'running';
+    const checks = CHECKS[id] || [];
+    const applied = checks.filter((c, i) => w.fixes[i]);
+    const cantRun = !w.file || w.status === 'running' || w.check === 'running';
+    const runLabel = w.check === 'running' ? 'Checking data…'
+      : w.status === 'running' ? (t.prep ? 'Applying…' : 'Running…')
+      : done ? (t.prep ? 'Apply again' : 'Run again')
+      : t.prep ? `Apply ${applied.length} fixes` : 'Run ' + t.name;
     const card = css('background: #FFFFFF; border: 1px solid #D9DEE3; border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 12px');
     const control = css('border: 1px solid #D9DEE3; border-radius: 8px; padding: 8px 10px; min-height: 42px; font-weight: 400; font-size: 14px; background: #FFFFFF');
     const field = css('display: flex; flex-direction: column; gap: 6px; font-weight: 600; font-size: 13px');
@@ -206,13 +381,13 @@ export default class Tools extends React.Component {
               {!w.file ? (
                 <>
                   <label style={css('position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; text-align: center; padding: 26px 16px; border: 2px dashed #BCC5CD; border-radius: 12px; background: #F7F9FA; cursor: pointer')}>
-                    <input type="file" onChange={(e) => { const f = e.target.files?.[0]; if (f) this.setWork(id, { file: f.name, size: fileSize(f.size), status: 'ready' }); }}
+                    <input type="file" onChange={(e) => { const f = e.target.files?.[0]; if (f) this.loadFile(id, f.name, fileSize(f.size)); }}
                       aria-label="Upload data file" style={css('position: absolute; width: 1px; height: 1px; opacity: 0')} />
                     <UploadIcon />
                     <span style={css('font-weight: 600')}>Drop a file or <span style={css('color: #0B6E5F; text-decoration: underline')}>browse</span></span>
                     <span style={css(`font-family: ${MONO}; font-size: 11.5px; color: #5A6670`)}>{t.accepts}</span>
                   </label>
-                  <button onClick={() => this.setWork(id, { file: t.sample[0], size: t.sample[1] + ' · sample', status: 'ready' })}
+                  <button onClick={() => this.loadFile(id, t.sample[0], t.sample[1] + ' · sample')}
                     style={css('align-self: flex-start; border: 0; background: transparent; color: #0B6E5F; font-weight: 600; padding: 4px 0; min-height: 32px; text-decoration: underline')}>Use sample file: {t.sample[0]}</button>
                 </>
               ) : (
@@ -222,14 +397,17 @@ export default class Tools extends React.Component {
                     <span style={css(`font-family: ${MONO}; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap`)}>{w.file}</span>
                     <span style={css('font-size: 12px; color: #5A6670')}>{w.size}</span>
                   </span>
-                  <button onClick={() => this.setWork(id, { file: null, size: '', status: 'idle' })} aria-label="Remove file"
+                  <button onClick={() => this.clearFile(id)} aria-label="Remove file"
                     style={css('flex: none; width: 36px; height: 36px; border: 0; border-radius: 8px; background: transparent; color: #5A6670; display: grid; place-items: center; padding: 0')}><CloseIcon /></button>
                 </div>
               )}
             </section>
 
+            {this.renderCheck(id, w, checks, card, step)}
+
+            {!t.prep && (
             <section style={{ ...card, gap: 10 }}>
-              {step(2, 'Choose a model')}
+              {step(3, 'Choose a model')}
               {t.models.map(([name, note]) => {
                 const on = w.model === name;
                 return (
@@ -247,9 +425,10 @@ export default class Tools extends React.Component {
               })}
               <span style={css('font-size: 12px; color: #5A6670')}>Or add your own: a Hugging Face model ID or an .onnx file.</span>
             </section>
+            )}
 
             <section style={{ ...card, gap: 14 }}>
-              {step(3, t.name + ' settings')}
+              {step(t.prep ? 3 : 4, t.prep ? 'Output' : t.name + ' settings')}
               {t.opts.map((o) => {
                 const v = w.opts[o.key];
                 if (o.type === 'select') return (
@@ -277,7 +456,7 @@ export default class Tools extends React.Component {
 
             <button onClick={() => this.run(id)} disabled={cantRun}
               style={css(`border: 0; border-radius: 10px; background: #0B6E5F; color: #FFFFFF; padding: 12px 18px; min-height: 48px; font-weight: 600; font-size: 15px; opacity: ${cantRun ? 0.5 : 1}`)}>
-              {w.status === 'running' ? 'Running…' : done ? 'Run again' : 'Run ' + t.name}
+              {runLabel}
             </button>
           </div>
 
@@ -294,15 +473,17 @@ export default class Tools extends React.Component {
               <div style={css('display: grid; place-items: center; text-align: center; min-height: 300px; border: 1px dashed #C3CBD2; border-radius: 12px; padding: 24px; color: #5A6670')}>
                 <div style={css('display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: 340px')}>
                   <Icon name={id} size={32} color="#9AA4AC" width={1.8} />
-                  <span style={css('font-weight: 600; color: #142019')}>{w.file ? 'Ready when you are' : 'No results yet'}</span>
-                  <span style={css('font-size: 13px')}>{w.file ? 'Check the model and settings, then press Run.' : `Upload a file or use the sample file, then run ${t.name}.`}</span>
+                  <span style={css('font-weight: 600; color: #142019')}>{!w.file ? 'No results yet' : w.check === 'running' ? 'Checking your data…' : 'Ready when you are'}</span>
+                  <span style={css('font-size: 13px')}>{!w.file ? (t.prep ? 'Upload a file or use the sample file to see what needs fixing.' : `Upload a file or use the sample file, then run ${t.name}.`)
+                    : w.check === 'running' ? 'Looking for problems before anything runs.'
+                    : t.prep ? 'Choose which fixes to keep, then press Apply.' : 'Review the data check, model and settings, then press Run.'}</span>
                 </div>
               </div>
             )}
 
             {w.status === 'running' && (
               <div style={css('display: flex; flex-direction: column; gap: 10px; justify-content: center; min-height: 300px; padding: 24px; border-radius: 12px; background: #F7F9FA')}>
-                <span>Running <b>{w.model}</b> on {w.file}…</span>
+                <span>{t.prep ? 'Applying fixes to ' : <>Running <b>{w.model}</b> on </>}{w.file}…</span>
                 <div style={css('height: 6px; border-radius: 3px; background: #DDE2E6; overflow: hidden')}><div className="bar-run" style={css('width: 40%; height: 100%; border-radius: 3px; background: #0B6E5F')} /></div>
               </div>
             )}
@@ -317,11 +498,16 @@ export default class Tools extends React.Component {
                     </div>
                   ))}
                 </div>
+                {t.prep ? <Recipe applied={applied} /> : applied.length > 0 && (
+                  <div style={css('display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 8px; background: #F1F8F6; color: #0B6E5F; font-size: 13px; font-weight: 600')}>
+                    <Icon d="M5 12l5 5 9-10" size={16} />Data check: {applied.length} {applied.length === 1 ? 'fix' : 'fixes'} applied before running
+                  </div>
+                )}
                 <span style={css('font-weight: 600')}>{r.title}</span>
                 <Result r={r} />
                 <div style={css('display: flex; flex-wrap: wrap; gap: 8px; padding-top: 14px; border-top: 1px solid #EDF0F2')}>
-                  <button style={outline}>Export CSV</button>
-                  <button style={outline}>Export JSON</button>
+                  <button style={outline}>{t.prep ? 'Download cleaned file' : 'Export CSV'}</button>
+                  <button style={outline}>{t.prep ? 'Download recipe' : 'Export JSON'}</button>
                   <a href="#/" style={css('display: inline-flex; align-items: center; padding: 8px 14px; min-height: 40px; border-radius: 8px; background: #142019; color: #FFFFFF; text-decoration: none; font-weight: 600')}>Add to whiteboard</a>
                 </div>
               </>
@@ -353,6 +539,19 @@ export default class Tools extends React.Component {
   }
 }
 
+function Recipe({ applied }) {
+  return (
+    <div style={css('display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; border-radius: 12px; background: #F7F9FA; border: 1px solid #EDF0F2')}>
+      <span style={css('font-weight: 600')}>Recipe · {applied.length} {applied.length === 1 ? 'step' : 'steps'}, in order</span>
+      {applied.length === 0 ? <span style={css('font-size: 13px; color: #5A6670')}>No fixes selected. The file was saved unchanged.</span> : (
+        <ol style={css('margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 3px; font-size: 13.5px')}>
+          {applied.map((c) => <li key={c[1]}>{c[3]} <span style={css('color: #5A6670')}>· {c[1].toLowerCase()}</span></li>)}
+        </ol>
+      )}
+    </div>
+  );
+}
+
 function Result({ r }) {
   if (r.kind === 'bars') return (
     <div style={css('display: flex; flex-direction: column; gap: 10px; font-variant-numeric: tabular-nums')}>
@@ -366,7 +565,7 @@ function Result({ r }) {
     </div>
   );
 
-  if (r.kind === 'table') {
+  if (r.kind === 'table' || r.kind === 'recipe') {
     const th = css('padding: 0 12px 8px 0; font-weight: 500');
     return (
       <div style={css('overflow-x: auto')}>

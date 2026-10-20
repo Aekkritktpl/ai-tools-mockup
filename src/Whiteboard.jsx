@@ -15,6 +15,8 @@ const TYPES = {
     models: ['XLM-RoBERTa (multilingual)', 'DistilBERT SST-2', 'BERT (fine-tuned)', 'Claude (prompted)'], p: { labels: 'Positive / Neutral / Negative' } },
   anom: { ai: true, label: 'Anomaly detection', short: 'Anomaly', tag: 'ANOMALY DETECTION', w: 380, accept: 'CSV, Parquet', title: 'New anomaly detector',
     models: ['Isolation Forest', 'Autoencoder', 'Matrix Profile (STUMPY)'], p: { conf: 90 } },
+  prep: { ai: true, label: 'Clean & prepare data', short: 'Clean data', tag: 'DATA PREP', w: 340, accept: 'CSV, XLSX, Parquet', title: 'Clean data',
+    models: ['Auto (checks + AI suggestions)'], p: { fmt: 'CSV' } },
   note: { ai: false, label: 'Sticky note', short: 'Sticky', tag: 'STICKY NOTE', w: 260 },
   label: { ai: false, label: 'Text', short: 'Text', tag: 'TEXT', w: 520 },
 };
@@ -117,6 +119,7 @@ export default class Whiteboard extends React.Component {
   params(it) {
     const sel = (label, key, options) => ({ kind: 'select', label, key, value: it.p[key], options, onChange: (e) => this.setP(it.id, key, e.target.value) });
     const rng = (label, key) => ({ kind: 'range', label, key, value: it.p[key], onChange: (e) => this.setP(it.id, key, Number(e.target.value)) });
+    if (it.type === 'prep') return [sel('Save cleaned file as', 'fmt', ['CSV', 'Excel (.xlsx)', 'Parquet'])];
     if (it.type === 'ts') return [sel('Target column', 'target', ['revenue', 'units_sold', 'orders', 'site_visits']), sel('Forecast horizon', 'horizon', ['4 weeks', '8 weeks', '12 weeks', '26 weeks'])];
     if (it.type === 'ocr') return [sel('Document language', 'lang', ['English', 'Thai', 'English + Thai', 'Auto-detect']), rng('Review below confidence', 'conf')];
     if (it.type === 'img') return [rng('Flag below confidence', 'conf'), sel('Show', 'topk', ['Top 1 class', 'Top 3 classes', 'Top 4 classes'])];
@@ -229,6 +232,7 @@ export default class Whiteboard extends React.Component {
           {done && it.type === 'img' && <ImgResult topk={p.topk} conf={p.conf} />}
           {done && it.type === 'txt' && <TxtResult labels={p.labels} />}
           {done && it.type === 'anom' && <AnomResult />}
+          {done && it.type === 'prep' && <PrepResult fmt={p.fmt} />}
 
           {it.file && (
             <div style={css('display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding-top: 10px; border-top: 1px solid #EDF0F2; font-size: 12px; color: #5A6670; min-width: 0')}>
@@ -323,7 +327,7 @@ export default class Whiteboard extends React.Component {
   }
 
   renderDock() {
-    const keys = ['note', 'label', '|', 'ts', 'ocr', 'img', 'txt', 'anom'];
+    const keys = ['note', 'label', '|', 'prep', 'ts', 'ocr', 'img', 'txt', 'anom'];
     return (
       <div className="wb-dock" aria-label="Add to board" style={css('position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); display: flex; align-items: stretch; justify-content: center; gap: 4px; padding: 6px; background: #FFFFFF; border: 1px solid #D9DEE3; border-radius: 14px; box-shadow: 0 8px 24px rgba(20, 32, 25, 0.12); z-index: 10')}>
         {keys.map((k, i) => {
@@ -613,6 +617,23 @@ function TxtResult({ labels }) {
         <span style={chip}>delivery time · 41</span><span style={chip}>price · 28</span><span style={chip}>packaging · 12</span>
       </div>
       <div style={muted}>2,318 reviews · labels: {labels}</div>
+    </>
+  );
+}
+
+function PrepResult({ fmt }) {
+  const fixes = ['Dates converted to YYYY-MM-DD', '138 duplicate rows removed', 'Revenue text converted to numbers', 'Branch names merged (Bangkok · BKK)', '2 extra header rows skipped'];
+  return (
+    <>
+      <div style={css('font-size: 12.5px; color: #5A6670')}>18,240 rows in · 18,102 rows out · <span style={{ color: '#0B6E5F', fontWeight: 600 }}>5 fixes applied</span></div>
+      <ul style={css('list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; font-size: 13px')}>
+        {fixes.map((f) => (
+          <li key={f} style={css('display: flex; align-items: flex-start; gap: 7px')}>
+            <span style={css('flex: none; margin-top: 2px; color: #0B6E5F')}><Icon d="M5 12l5 5 9-10" size={14} width={2.5} /></span>{f}
+          </li>
+        ))}
+      </ul>
+      <div style={muted}>Saved as {fmt} · recipe saved for next upload</div>
     </>
   );
 }
